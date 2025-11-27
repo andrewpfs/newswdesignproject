@@ -1,0 +1,42 @@
+{
+  "development": {
+    "username": "group30",
+    "password": "Admin123",
+    "database": "UHSoftwareDatabase",
+    "host": "softwaredb.database.windows.net",
+    "port": 1433,
+    "dialect": "mssql",
+    "dialectOptions": {
+      "options": {
+        "trustServerCertificate": true
+      }
+    }
+  },
+  "test": {
+    "username": "group30",
+    "password": "Admin123",
+    "database": "UHSoftwareDatabase",
+    "host": "softwaredb.database.windows.net",
+    "port": 1433,
+    "dialect": "mssql",
+    "dialectOptions": {
+      "options": {
+        "trustServerCertificate": true
+      }
+    }
+  },
+  "production": {
+    "username": "group30",
+    "password": "Admin123",
+    "database": "UHSoftwareDatabase",
+    "host": "softwaredb.database.windows.net",
+    "port": 1433,
+    "dialect": "mssql",
+    "dialectOptions": {
+      "options": {
+        "encrypt": true,
+        "trustServerCertificate": true
+      }
+    }
+  }
+}

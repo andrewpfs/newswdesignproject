@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Event</title>
+
+  <link rel="stylesheet" href="App.css" />
+  
+</head>
+<body>
+  <div>
+    <h1>Create Event</h1>
+      <form id="eventForm" action="/create-event" method="POST">
+
+      <label for="eventName">Event Name</label><br>
+      <input type="text" id="eventName" name="eventName" maxlength="100" required><br>
+
+      <label for="eventDescription">Event Description</label><br>
+      <textarea id="eventDescription" name="eventDescription" rows="4" required></textarea><br>
+
+      <label for="eventLocation">Location</label><br>
+      <textarea id="eventLocation" name="eventLocation" rows="2" required></textarea><br>
+
+      <label>Required Skills</label><br>
+      <div class="dropdown">
+        <button type="button" class="dropbtn" id="skillsBtn">
+          Select Skills ▼
+        </button>
+        <div id="skillsDropdown" class="dropdown-content">
+          <label><input type="checkbox" name="requiredSkills" value="Communication"> Communication</label>
+          <label><input type="checkbox" name="requiredSkills" value="Teamwork"> Teamwork</label>
+          <label><input type="checkbox" name="requiredSkills" value="Organized"> Organized</label>
+          <label><input type="checkbox" name="requiredSkills" value="Adaptability"> Adaptability</label>
+          <label><input type="checkbox" name="requiredSkills" value="Driving"> Driving</label>
+          <label><input type="checkbox" name="requiredSkills" value="English"> English</label>
+          <label><input type="checkbox" name="requiredSkills" value="Spanish"> Spanish</label>
+        </div>
+      </div>
+      <div id="skillsError" class="error-msg" style="display:none;">Please select at least one skill.</div>
+
+      <label>Urgency</label><br>
+      <div class="dropdown">
+        <button type="button" class="dropbtn" id="urgencyBtn">
+          Select Urgency ▼
+        </button>
+        <div id="urgencyDropdown" class="dropdown-content">
+          <a href="#" data-value="low">Low</a>
+          <a href="#" data-value="medium">Medium</a>
+          <a href="#" data-value="high">High</a>
+          <a href="#" data-value="critical">Critical</a>
+        </div>
+      </div>
+      <input type="hidden" name="urgency" id="urgencyValue" required>
+      <div id="urgencyError" class="error-msg" style="display:none;">Please select urgency.</div>
+
+      <label for="eventDate">Event Date</label><br>
+      <input type="date" id="eventDate" name="eventDate" required><br>
+
+      <label for="startTime">Event Start Time</label><br>
+      <input type="time" id="startTime" name="startTime" required><br>
+
+      <label for="endTime">Event End Time</label><br>
+      <input type="time" id="endTime" name="endTime" required><br>
+
+      <button type="submit">Create Event</button>
+    </form>
+  </div>
+
+  <script src="App.js"></script>
+</body>
+</html>

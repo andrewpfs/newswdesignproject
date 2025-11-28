@@ -78,6 +78,58 @@ textarea {
   box-sizing: border-box;
 }
 
+/* Remove browser autocomplete icons and validation boxes */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  right: 0;
+}
+
+input::-webkit-validation-bubble,
+input::-webkit-validation-bubble-message {
+  display: none !important;
+}
+
+/* Hide browser autofill icons */
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+}
+
+/* Remove any corner decorations */
+input::before,
+input::after,
+textarea::before,
+textarea::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Hide browser geolocation and autocomplete icons */
+textarea::-webkit-contacts-auto-fill-button,
+textarea::-webkit-credentials-auto-fill-button,
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Hide any browser suggestion boxes */
+input::-webkit-list-button,
+textarea::-webkit-list-button {
+  display: none !important;
+}
+
 .app-shell{
   width:100%;
   max-width:960px;
@@ -149,7 +201,8 @@ textarea {
 }
 
 .header-btn{
-  padding:8px 16px;
+  padding:10px 18px;
+  min-width:100px;
   border-radius:4px;
   background:#3498DB;
   color:#fff;
@@ -160,7 +213,10 @@ textarea {
   cursor:pointer;
   display:inline-flex;
   align-items:center;
+  justify-content:center;
   gap:6px;
+  font-size:14px;
+  white-space:nowrap;
 }
 
 .header-btn:hover{
@@ -602,6 +658,14 @@ textarea {
   justify-content:space-between;
   align-items:center;
   margin-bottom:24px;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.notifications-header > div:last-child{
+  display:flex;
+  gap:12px;
+  align-items:center;
 }
 
 .notifications-header h1{
@@ -621,18 +685,22 @@ textarea {
 }
 
 .mark-all-btn{
-  padding:8px 16px;
+  padding:10px 20px;
   background:#3498DB;
   color:#fff;
   border:none;
-  border-radius:4px;
+  border-radius:6px;
   font-weight:600;
   cursor:pointer;
-  transition:background 0.2s ease;
+  transition:all 0.2s ease;
+  font-size:14px;
+  box-shadow:0 2px 4px rgba(52, 152, 219, 0.2);
 }
 
 .mark-all-btn:hover{
   background:#2980B9;
+  box-shadow:0 4px 8px rgba(52, 152, 219, 0.3);
+  transform:translateY(-1px);
 }
 
 .notifications-filters{
@@ -782,27 +850,41 @@ textarea {
 }
 
 .action-btn{
-  width:32px;
-  height:32px;
+  min-width:80px;
+  padding:8px 16px;
+  height:auto;
   border:1px solid #ddd;
   background:#fff;
-  border-radius:4px;
+  border-radius:6px;
   cursor:pointer;
   transition:all 0.2s ease;
-  font-size:14px;
+  font-size:13px;
+  font-weight:500;
   display:flex;
   align-items:center;
   justify-content:center;
+  color:#555;
+  box-shadow:0 1px 3px rgba(0,0,0,0.1);
 }
 
 .action-btn:hover{
   background:#f8f9fa;
   border-color:#3498DB;
+  color:#3498DB;
+  box-shadow:0 2px 6px rgba(0,0,0,0.15);
+  transform:translateY(-1px);
+}
+
+.action-btn.delete{
+  color:#e74c3c;
+  border-color:#e74c3c;
 }
 
 .action-btn.delete:hover{
   background:#fee;
-  border-color:#e74c3c;
+  border-color:#c0392b;
+  color:#c0392b;
+  box-shadow:0 2px 6px rgba(231, 76, 60, 0.3);
 }
 
 .history-page{
@@ -847,13 +929,14 @@ textarea {
   background:#fff;
   border-radius:8px;
   box-shadow:0 2px 8px rgba(0,0,0,0.08);
-  overflow-x:auto;
+  overflow-x:visible;
+  width:100%;
 }
 
 .history-table{
   width:100%;
   border-collapse:collapse;
-  min-width:1000px;
+  table-layout:auto;
 }
 
 .history-table thead{
@@ -862,19 +945,31 @@ textarea {
 
 .history-table th{
   text-align:left;
-  padding:14px 16px;
+  padding:12px 14px;
   font-weight:600;
   font-size:13px;
   color:#555;
   border-bottom:2px solid #e0e0e0;
-  white-space:nowrap;
+  white-space:normal;
 }
 
 .history-table td{
-  padding:16px;
+  padding:12px 14px;
   border-bottom:1px solid #f0f0f0;
   font-size:14px;
   vertical-align:top;
+  word-wrap:break-word;
+}
+
+.history-table td.event-name{
+  min-width:120px;
+  max-width:180px;
+}
+
+.history-table td.description-cell{
+  min-width:200px;
+  max-width:350px;
+  word-wrap:break-word;
 }
 
 .history-table tbody tr:hover{
@@ -952,7 +1047,13 @@ textarea {
 
 @media(max-width:1100px){
   .history-table-container{
-    overflow-x:scroll;
+    overflow-x:visible;
+  }
+  
+  .history-table th,
+  .history-table td{
+    padding:10px 12px;
+    font-size:13px;
   }
 }
 
@@ -962,6 +1063,9 @@ textarea {
   border-color: #fff;
   cursor: default;
   font-weight: 700;
+  padding:10px 18px;
+  min-width:100px;
+  justify-content:center;
 }
 
 .header-role:hover {
@@ -973,6 +1077,9 @@ textarea {
   background-color: #e74c3c;
   color: #fff;
   border-color: #e74c3c;
+  padding:10px 18px;
+  min-width:100px;
+  justify-content:center;
 }
 
 .header-logout:hover {

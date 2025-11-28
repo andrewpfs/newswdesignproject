@@ -1,10 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
+import { isAuthenticated, getUserRole } from "../utils/auth";
 import "../App.css";
 
 const LoginRegister = () => {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated()) {
+      const role = getUserRole();
+      if (role === "admin") {
+        navigate("/");
+      } else {
+        navigate("/profile");
+      }
+    }
+  }, [navigate]);
 
   const loginSchema = Yup.object({
     email: Yup.string()
@@ -40,19 +55,17 @@ const LoginRegister = () => {
       const result = await response.json();
 
       if (response.ok) {
-        // Store auth data
-        localStorage.setItem("authToken", result.token);
-        localStorage.setItem("userId", result.userId);
-        localStorage.setItem("userRole", result.role);
-        localStorage.setItem("userEmail", values.email);
+        // Store auth data (data is nested in result.data)
+        localStorage.setItem("authToken", result.data.token);
+        localStorage.setItem("userId", result.data.user.id);
+        localStorage.setItem("userRole", result.data.user.role);
+        localStorage.setItem("userEmail", result.data.user.email);
         
-        // Show success and redirect based on role
-        alert(`Login successful! Welcome, ${result.role}!`);
-        
-        if (result.role === "admin") {
+        // Redirect based on role
+        if (result.data.user.role === "admin") {
           window.location.href = "/"; // Admin goes to create event
         } else {
-          window.location.href = "/profile"; // Volunteer goes to profile
+          window.location.href = "/profile"; // Volunteer goes to profile to complete their profile
         }
       } else {
         setErrors({ submit: result.error || "Login failed" });
@@ -77,8 +90,34 @@ const LoginRegister = () => {
       const result = await response.json();
 
       if (response.ok) {
-        alert("Registration successful! Please log in.");
-        setIsLogin(true);
+        // Auto-login after successful registration and redirect to profile
+        alert("Registration successful! Redirecting to profile setup...");
+        
+        // Automatically log them in
+        const loginResponse = await fetch("http://localhost:3001/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: values.email,
+            password: values.password,
+          }),
+        });
+
+        const loginResult = await loginResponse.json();
+
+        if (loginResponse.ok) {
+          // Store auth data
+          localStorage.setItem("authToken", loginResult.data.token);
+          localStorage.setItem("userId", loginResult.data.user.id);
+          localStorage.setItem("userRole", loginResult.data.user.role);
+          localStorage.setItem("userEmail", loginResult.data.user.email);
+          
+          // Redirect to profile to complete setup
+          window.location.href = "/profile";
+        } else {
+          // If auto-login fails, just switch to login form
+          setIsLogin(true);
+        }
       } else {
         setErrors({ submit: result.error || "Registration failed" });
       }

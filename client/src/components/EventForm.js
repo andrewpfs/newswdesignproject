@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { authFetch, isAuthenticated, isAdmin } from "../utils/auth";
 import "../App.css";
 
 const SKILLS = [
@@ -14,6 +16,7 @@ const SKILLS = [
 const URGENCY_LEVELS = ["low", "medium", "high", "critical"];
 
 const EventForm = () => {
+  const navigate = useNavigate();
   const [eventName, setEventName] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventLocation, setEventLocation] = useState("");
@@ -24,6 +27,30 @@ const EventForm = () => {
   const [endTime, setEndTime] = useState("");
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [urgencyOpen, setUrgencyOpen] = useState(false);
+
+  // Check authentication and admin role
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate("/login");
+    } else if (!isAdmin()) {
+      navigate("/profile");
+    }
+  }, [navigate]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.dropdown')) {
+        setSkillsOpen(false);
+        setUrgencyOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const toggleSkill = (skill) => {
     setRequiredSkills((prev) =>
@@ -51,16 +78,16 @@ const EventForm = () => {
     };
 
     try {
-      const res = await fetch("http://localhost:3001/create-event", {
+      const res = await authFetch("http://localhost:3001/api/events", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
 
       const result = await res.json();
 
-      if (res.ok) {
+      if (res.ok && result.success) {
         alert(result.message || "Event created successfully!");
+        // Clear form
         setEventName("");
         setEventDescription("");
         setEventLocation("");
@@ -70,11 +97,18 @@ const EventForm = () => {
         setStartTime("");
         setEndTime("");
       } else {
-        alert("Error: " + (result.error || "Failed to create event."));
+        const errorMsg = result.errors 
+          ? result.errors.join(", ") 
+          : (result.error || "Failed to create event.");
+        alert("Error: " + errorMsg);
       }
     } catch (err) {
       console.error(err);
-      alert("Server error. Please try again later.");
+      if (err.message === "Unauthorized") {
+        navigate("/login");
+      } else {
+        alert("Server error. Please try again later.");
+      }
     }
   };
 
@@ -107,6 +141,7 @@ const EventForm = () => {
           rows="2"
           value={eventLocation}
           onChange={(e) => setEventLocation(e.target.value)}
+          autoComplete="off"
           required
         />
 
@@ -172,18 +207,20 @@ const EventForm = () => {
         <label htmlFor="startTime">Event Start Time</label>
         <input
           id="startTime"
-          type="time"
+          type="text"
           value={startTime}
           onChange={(e) => setStartTime(e.target.value)}
+          placeholder="e.g., 09:00 or 14:30"
           required
         />
 
         <label htmlFor="endTime">Event End Time</label>
         <input
           id="endTime"
-          type="time"
+          type="text"
           value={endTime}
           onChange={(e) => setEndTime(e.target.value)}
+          placeholder="e.g., 17:00 or 18:30"
           required
         />
 

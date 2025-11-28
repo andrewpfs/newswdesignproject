@@ -1,42 +1,56 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { authFetch, isAuthenticated, getUserId } from "../utils/auth";
 import "../App.css";
 
 const Notifications = () => {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all"); // all, unread, read
 
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    if (!isAuthenticated()) {
+      navigate("/login");
+    } else {
+      fetchNotifications();
+    }
+  }, [navigate]);
 
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      // Get user ID from localStorage (mock auth)
-      const userId = localStorage.getItem("userId") || "1";
+      const userId = getUserId();
+      if (!userId) {
+        navigate("/login");
+        return;
+      }
       
-      const response = await fetch(
+      const response = await authFetch(
         `http://localhost:3001/api/notifications?userId=${userId}`
       );
       
       if (response.ok) {
         const data = await response.json();
         setNotifications(data.data || []);
+      } else if (response.status === 401 || response.status === 403) {
+        navigate("/login");
       }
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
+      if (error.message === "Unauthorized") {
+        navigate("/login");
+      }
     }
     setLoading(false);
   };
 
   const markAsRead = async (notificationId) => {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `http://localhost:3001/api/notifications/${notificationId}/read`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
         }
       );
 
@@ -47,9 +61,14 @@ const Notifications = () => {
             notif.id === notificationId ? { ...notif, read: true } : notif
           )
         );
+        // Refresh to get latest count
+        fetchNotifications();
       }
     } catch (error) {
       console.error("Failed to mark as read:", error);
+      if (error.message === "Unauthorized") {
+        navigate("/login");
+      }
     }
   };
 
@@ -69,7 +88,7 @@ const Notifications = () => {
 
   const deleteNotification = async (notificationId) => {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `http://localhost:3001/api/notifications/${notificationId}`,
         {
           method: "DELETE",
@@ -83,6 +102,9 @@ const Notifications = () => {
       }
     } catch (error) {
       console.error("Failed to delete notification:", error);
+      if (error.message === "Unauthorized") {
+        navigate("/login");
+      }
     }
   };
 
@@ -98,18 +120,8 @@ const Notifications = () => {
   };
 
   const getNotificationIcon = (type) => {
-    switch (type) {
-      case "assignment":
-        return "📅";
-      case "update":
-        return "🔔";
-      case "reminder":
-        return "⏰";
-      case "cancellation":
-        return "❌";
-      default:
-        return "ℹ️";
-    }
+    // Return empty or use text labels instead of emojis
+    return "";
   };
 
   const filteredNotifications = getFilteredNotifications();
@@ -125,11 +137,20 @@ const Notifications = () => {
               <span className="unread-badge">{unreadCount} unread</span>
             )}
           </div>
-          {unreadCount > 0 && (
-            <button className="mark-all-btn" onClick={markAllAsRead}>
-              Mark All as Read
+          <div>
+            <button 
+              className="mark-all-btn" 
+              onClick={fetchNotifications}
+              title="Refresh"
+            >
+              Refresh
             </button>
-          )}
+            {unreadCount > 0 && (
+              <button className="mark-all-btn" onClick={markAllAsRead}>
+                Mark All as Read
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="notifications-filters">
@@ -220,13 +241,13 @@ const Notifications = () => {
                       ✓
                     </button>
                   )}
-                  <button
-                    className="action-btn delete"
-                    onClick={() => deleteNotification(notification.id)}
-                    title="Delete"
-                  >
-                    🗑️
-                  </button>
+                    <button
+                      className="action-btn delete"
+                      onClick={() => deleteNotification(notification.id)}
+                      title="Delete"
+                    >
+                      Delete
+                    </button>
                 </div>
               </div>
             ))}

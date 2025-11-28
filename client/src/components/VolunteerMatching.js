@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { authFetch, isAuthenticated, isAdmin } from "../utils/auth";
 import "../App.css";
 
 const VolunteerMatching = () => {
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [volunteers, setVolunteers] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -9,33 +12,50 @@ const VolunteerMatching = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  // Check authentication and admin role
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate("/login");
+    } else if (!isAdmin()) {
+      navigate("/profile");
+    }
+  }, [navigate]);
+
   // Fetch events on load
   useEffect(() => {
-    fetchEvents();
-    fetchVolunteers();
+    if (isAuthenticated() && isAdmin()) {
+      fetchEvents();
+      fetchVolunteers();
+    }
   }, []);
 
   const fetchEvents = async () => {
     try {
-      const response = await fetch("http://localhost:3001/api/events");
+      const response = await authFetch("http://localhost:3001/api/events");
       if (response.ok) {
         const data = await response.json();
         setEvents(data.data || []);
       }
     } catch (error) {
       console.error("Failed to fetch events:", error);
+      if (error.message === "Unauthorized") {
+        navigate("/login");
+      }
     }
   };
 
   const fetchVolunteers = async () => {
     try {
-      const response = await fetch("http://localhost:3001/api/matching/volunteers");
+      const response = await authFetch("http://localhost:3001/api/matching/volunteers");
       if (response.ok) {
         const data = await response.json();
         setVolunteers(data.data || []);
       }
     } catch (error) {
       console.error("Failed to fetch volunteers:", error);
+      if (error.message === "Unauthorized") {
+        navigate("/login");
+      }
     }
   };
 
@@ -51,7 +71,7 @@ const VolunteerMatching = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `http://localhost:3001/api/matching/suggestions/${eventId}`
       );
       if (response.ok) {
@@ -60,6 +80,9 @@ const VolunteerMatching = () => {
       }
     } catch (error) {
       console.error("Failed to fetch matched volunteers:", error);
+      if (error.message === "Unauthorized") {
+        navigate("/login");
+      }
     }
     setLoading(false);
   };
@@ -68,9 +91,8 @@ const VolunteerMatching = () => {
     if (!selectedEvent) return;
 
     try {
-      const response = await fetch("http://localhost:3001/api/matching/assign", {
+      const response = await authFetch("http://localhost:3001/api/matching/assign", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           volunteerId,
           eventId: selectedEvent.id,
@@ -78,15 +100,23 @@ const VolunteerMatching = () => {
       });
 
       if (response.ok) {
-        setMessage("Volunteer assigned successfully!");
+        const result = await response.json();
+        setMessage(result.message || "Volunteer assigned successfully!");
         // Refresh the matched volunteers list
         handleEventSelect(selectedEvent.id);
       } else {
         const result = await response.json();
-        setMessage(result.error || "Failed to assign volunteer");
+        const errorMsg = result.error || result.details || "Failed to assign volunteer";
+        setMessage(errorMsg);
+        console.error("Assign error:", result);
       }
     } catch (error) {
-      setMessage("Server error. Please try again.");
+      console.error("Assign error:", error);
+      if (error.message === "Unauthorized") {
+        navigate("/login");
+      } else {
+        setMessage("Server error. Please try again.");
+      }
     }
   };
 
@@ -125,7 +155,17 @@ const VolunteerMatching = () => {
               <option value="">-- Choose an event --</option>
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
-                  {event.eventName} ({new Date(event.eventDate).toLocaleDateString()})
+                  {event.eventName} ({(() => {
+                    if (!event.eventDate) return 'N/A';
+                    const dateStr = event.eventDate.toString();
+                    if (dateStr.includes('-')) {
+                      const datePart = dateStr.split('T')[0];
+                      const [year, month, day] = datePart.split('-');
+                      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                      return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                    }
+                    return new Date(event.eventDate).toLocaleDateString();
+                  })()})
                 </option>
               ))}
             </select>
@@ -133,12 +173,35 @@ const VolunteerMatching = () => {
             {selectedEvent && (
               <div className="event-details">
                 <h3>{selectedEvent.eventName}</h3>
-                <p><strong>Date:</strong> {new Date(selectedEvent.eventDate).toLocaleDateString()}</p>
+                <p><strong>Date:</strong> {(() => {
+                  if (!selectedEvent.eventDate) return 'N/A';
+                  const dateStr = selectedEvent.eventDate.toString();
+                  if (dateStr.includes('-')) {
+                    const datePart = dateStr.split('T')[0];
+                    const [year, month, day] = datePart.split('-');
+                    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                    return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                  }
+                  return new Date(selectedEvent.eventDate).toLocaleDateString();
+                })()}</p>
                 <p><strong>Location:</strong> {selectedEvent.eventLocation}</p>
                 <p><strong>Description:</strong> {selectedEvent.eventDescription}</p>
                 <p>
                   <strong>Required Skills:</strong>{" "}
-                  {selectedEvent.requiredSkills?.join(", ") || "None"}
+                  {(() => {
+                    const skills = Array.isArray(selectedEvent.requiredSkills) 
+                      ? selectedEvent.requiredSkills 
+                      : (typeof selectedEvent.requiredSkills === 'string' 
+                          ? (() => {
+                              try {
+                                return JSON.parse(selectedEvent.requiredSkills);
+                              } catch {
+                                return [];
+                              }
+                            })()
+                          : []);
+                    return skills.length > 0 ? skills.join(", ") : "None";
+                  })()}
                 </p>
                 <p>
                   <strong>Urgency:</strong>{" "}
@@ -169,18 +232,48 @@ const VolunteerMatching = () => {
                 {matchedVolunteers.map((volunteer) => {
                   const matchScore = calculateMatchScore(volunteer);
                   return (
-                    <div key={volunteer.id} className="volunteer-card">
+                    <div key={volunteer.userId || volunteer.id} className="volunteer-card">
                       <div className="volunteer-header">
                         <h4>{volunteer.fullName}</h4>
                         <span className={`match-score score-${Math.floor(matchScore / 25)}`}>
                           {matchScore}% Match
                         </span>
                       </div>
-                      <p><strong>Skills:</strong> {volunteer.skills?.join(", ") || "None"}</p>
+                      <p><strong>Skills:</strong> {
+                        (() => {
+                          const skills = Array.isArray(volunteer.skills) 
+                            ? volunteer.skills 
+                            : (typeof volunteer.skills === 'string' 
+                                ? (() => {
+                                    try {
+                                      return JSON.parse(volunteer.skills);
+                                    } catch {
+                                      return [];
+                                    }
+                                  })()
+                                : []);
+                          return skills.length > 0 ? skills.join(", ") : "None";
+                        })()
+                      }</p>
                       <p><strong>Location:</strong> {volunteer.city}, {volunteer.state}</p>
                       <p>
                         <strong>Availability:</strong>{" "}
-                        {volunteer.availability?.map(d => new Date(d).toLocaleDateString()).join(", ") || "Not specified"}
+                        {(() => {
+                          const availability = Array.isArray(volunteer.availability) 
+                            ? volunteer.availability 
+                            : (typeof volunteer.availability === 'string' 
+                                ? (() => {
+                                    try {
+                                      return JSON.parse(volunteer.availability);
+                                    } catch {
+                                      return [];
+                                    }
+                                  })()
+                                : []);
+                          return availability.length > 0 
+                            ? availability.map(d => new Date(d).toLocaleDateString()).join(", ") 
+                            : "Not specified";
+                        })()}
                       </p>
                       {volunteer.preferences && (
                         <p className="preferences"><strong>Preferences:</strong> {volunteer.preferences}</p>

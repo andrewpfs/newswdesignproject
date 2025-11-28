@@ -1,6 +1,7 @@
 const express = require("express");
 const yup = require("yup");
 const { UserProfile } = require("../models");
+const { authenticateToken } = require("./auth");
 
 const router = express.Router();
 
@@ -34,14 +35,15 @@ const profileSchema = yup.object({
   availability: yup.array().of(availabilityValidator).min(1).required(),
 });
 
-const requireUser = (req, res, next) => {
-  const userId = Number(req.header("x-user-id"));
-  if (!userId) {
-    return res.status(401).json({ error: "x-user-id header is required" });
-  }
-  req.userId = userId;
-  return next();
-};
+// No longer needed - using JWT authentication from auth.js
+// const requireUser = (req, res, next) => {
+//   const userId = Number(req.header("x-user-id"));
+//   if (!userId) {
+//     return res.status(401).json({ error: "x-user-id header is required" });
+//   }
+//   req.userId = userId;
+//   return next();
+// };
 
 const toArray = (value) => {
   if (Array.isArray(value)) return value;
@@ -49,18 +51,28 @@ const toArray = (value) => {
   return [];
 };
 
-router.get("/", requireUser, async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.sub; // Get user ID from JWT token
     const profile = await UserProfile.findOne({
-      where: { userId: req.userId },
+      where: { userId },
     });
+    
+    // Return null if profile doesn't exist
+    if (!profile) {
+      return res.json(null);
+    }
+    
     return res.json(profile);
   } catch (error) {
+    console.error("Error fetching profile:", error);
     return res.status(500).json({ error: "Failed to load profile" });
   }
 });
 
-router.post("/", requireUser, async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
+  const userId = req.user.sub; // Get user ID from JWT token
+  
   const payload = {
     ...req.body,
     address2: req.body.address2 || null,
@@ -71,16 +83,35 @@ router.post("/", requireUser, async (req, res) => {
 
   try {
     const data = await profileSchema.validate(payload, { abortEarly: false });
-    const [profile] = await UserProfile.upsert({
-      userId: req.userId,
-      ...data,
+    
+    // Use findOne + create/update instead of upsert for better error handling
+    const existingProfile = await UserProfile.findOne({
+      where: { userId },
     });
+
+    let profile;
+    if (existingProfile) {
+      // Update existing profile
+      await existingProfile.update(data);
+      profile = existingProfile;
+    } else {
+      // Create new profile
+      profile = await UserProfile.create({
+        userId,
+        ...data,
+      });
+    }
+    
     return res.json(profile);
   } catch (error) {
+    console.error("Error saving profile:", error);
     if (error instanceof yup.ValidationError) {
       return res.status(400).json({ errors: error.errors });
     }
-    return res.status(500).json({ error: "Failed to save profile" });
+    return res.status(500).json({ 
+      error: "Failed to save profile",
+      details: error.message 
+    });
   }
 });
 

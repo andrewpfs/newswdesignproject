@@ -1,22 +1,20 @@
 const express = require("express");
 const { Notification } = require("../models");
+const { authenticateToken } = require("./auth");
 
 const router = express.Router();
 
 // Get all notifications for a user
-router.get("/", async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.query;
+    // Get userId from query or use authenticated user's ID
+    const userId = req.query.userId || req.user.sub;
 
-    if (!userId) {
-      return res.status(400).json({
-        ok: false,
-        error: "User ID is required",
-      });
-    }
+    // Ensure user can only see their own notifications (unless admin)
+    const targetUserId = req.user.role === "admin" ? (req.query.userId || req.user.sub) : req.user.sub;
 
     const notifications = await Notification.findAll({
-      where: { userId },
+      where: { userId: targetUserId },
       order: [["createdAt", "DESC"]],
     });
 
@@ -68,7 +66,7 @@ router.post("/", async (req, res) => {
 });
 
 // Mark notification as read
-router.put("/:id/read", async (req, res) => {
+router.put("/:id/read", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -78,6 +76,14 @@ router.put("/:id/read", async (req, res) => {
       return res.status(404).json({
         ok: false,
         error: "Notification not found",
+      });
+    }
+
+    // Ensure user can only mark their own notifications (unless admin)
+    if (req.user.role !== "admin" && notification.userId !== req.user.sub) {
+      return res.status(403).json({
+        ok: false,
+        error: "You can only mark your own notifications as read",
       });
     }
 
@@ -99,7 +105,7 @@ router.put("/:id/read", async (req, res) => {
 });
 
 // Delete notification
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -109,6 +115,14 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({
         ok: false,
         error: "Notification not found",
+      });
+    }
+
+    // Ensure user can only delete their own notifications (unless admin)
+    if (req.user.role !== "admin" && notification.userId !== req.user.sub) {
+      return res.status(403).json({
+        ok: false,
+        error: "You can only delete your own notifications",
       });
     }
 

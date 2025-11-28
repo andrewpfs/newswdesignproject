@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ErrorMessage, Field, FieldArray, Form, Formik } from "formik";
 import * as Yup from "yup";
+import { authFetch, isAuthenticated, getUserId } from "../utils/auth";
 import "../App.css";
 
 const STATES = [
@@ -62,25 +64,54 @@ const profileSchema = Yup.object({
 const API_BASE = "http://localhost:3001";
 
 const ProfileForm = () => {
+  const navigate = useNavigate();
   const [initialValues, setInitialValues] = useState(DEFAULT_FORM);
-  const [userId, setUserId] = useState("1");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ message: "", errors: [] });
 
+  // Check authentication on mount
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate("/login");
+    }
+  }, [navigate]);
+
+  // Fetch profile on mount
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!userId) return;
+      if (!isAuthenticated()) return;
+      
       setLoading(true);
       setStatus({ message: "", errors: [] });
       try {
-        const response = await fetch(`${API_BASE}/profile`, {
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-id": userId,
-          },
-        });
+        const response = await authFetch(`${API_BASE}/api/profile`);
         const result = await response.json();
+        
         if (response.ok && result) {
+          // Parse skills and availability - they might come as JSON strings from database
+          let skills = [];
+          if (Array.isArray(result.skills)) {
+            skills = result.skills;
+          } else if (typeof result.skills === 'string') {
+            try {
+              skills = JSON.parse(result.skills);
+            } catch (e) {
+              skills = [];
+            }
+          }
+
+          let availability = [""];
+          if (Array.isArray(result.availability)) {
+            availability = result.availability.length > 0 ? result.availability : [""];
+          } else if (typeof result.availability === 'string') {
+            try {
+              const parsed = JSON.parse(result.availability);
+              availability = Array.isArray(parsed) && parsed.length > 0 ? parsed : [""];
+            } catch (e) {
+              availability = [""];
+            }
+          }
+
           setInitialValues({
             fullName: result.fullName || "",
             address1: result.address1 || "",
@@ -88,33 +119,30 @@ const ProfileForm = () => {
             city: result.city || "",
             state: result.state || "",
             zip: result.zip || "",
-            skills: result.skills?.length ? result.skills : [],
+            skills,
             preferences: result.preferences || "",
-            availability:
-              result.availability?.length > 0 ? result.availability : [""],
+            availability,
           });
         } else {
           setInitialValues(DEFAULT_FORM);
         }
       } catch (error) {
-        setStatus({ message: "", errors: ["Failed to load profile"] });
+        if (error.message !== "Unauthorized") {
+          setStatus({ message: "", errors: ["Failed to load profile"] });
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchProfile();
-  }, [userId]);
+  }, []);
 
   const handleSubmit = async (values, { setSubmitting }) => {
     setStatus({ message: "", errors: [] });
     try {
-      const response = await fetch(`${API_BASE}/profile`, {
+      const response = await authFetch(`${API_BASE}/api/profile`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": userId,
-        },
         body: JSON.stringify({
           ...values,
           address2: values.address2 || null,
@@ -124,7 +152,7 @@ const ProfileForm = () => {
       });
       const result = await response.json();
       if (response.ok) {
-        setStatus({ message: "Profile saved!", errors: [] });
+        setStatus({ message: "Profile saved successfully!", errors: [] });
       } else if (result?.errors?.length) {
         setStatus({ message: "", errors: result.errors });
       } else {
@@ -134,10 +162,14 @@ const ProfileForm = () => {
         });
       }
     } catch (error) {
-      setStatus({
-        message: "",
-        errors: ["Something went wrong, please try again"],
-      });
+      if (error.message === "Unauthorized") {
+        navigate("/login");
+      } else {
+        setStatus({
+          message: "",
+          errors: ["Something went wrong, please try again"],
+        });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -155,17 +187,6 @@ const ProfileForm = () => {
           {({ values, isSubmitting, setFieldValue }) => (
             <Form>
               <h1>Volunteer Profile Form</h1>
-
-              <div className="field">
-                <label htmlFor="userId">User ID header (mock auth)</label>
-                <input
-                  id="userId"
-                  type="number"
-                  min="1"
-                  value={userId}
-                  onChange={(event) => setUserId(event.target.value)}
-                />
-              </div>
 
               <div className="field">
                 <label htmlFor="fullName">
@@ -269,7 +290,7 @@ const ProfileForm = () => {
                 <FieldArray name="availability">
                   {() => (
                     <>
-                      {values.availability.map((_, index) => (
+                      {Array.isArray(values.availability) && values.availability.map((_, index) => (
                         <Field
                           key={`availability-${index}`}
                           type="date"
